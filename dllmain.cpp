@@ -1,5 +1,6 @@
 ﻿#include <windows.h>
 #include <Shlwapi.h>
+#include <sstream>
 
 #pragma region HookConfig
 #pragma comment( lib, "Shlwapi.lib")
@@ -652,16 +653,33 @@ BOOL WINAPI Init()
 	return TRUE;
 }
 #pragma endregion HookConfig
+DWORD HookAddr, ResumeAddr;
+int i = 0;
+void DbgPrintf(char* pszFormat, ...)
+{
+	char szBuf[1024];
+	va_list argList;
+	va_start(argList, pszFormat);
+	vsprintf_s(szBuf, pszFormat, argList);
+	strcat_s(szBuf, " [E盾Hook]\r\n");
+	OutputDebugStringA(szBuf);
+	va_end(argList);
+}
+//修正函数
+void __declspec(naked) OriginalFunc(void)
+{
+	__asm
+	{
+		push ebp
+		jmp[ResumeAddr]
+	}
+}
 DWORD WINAPI ThreadProc(LPVOID lpThreadParameter)
 {
 	HANDLE hProcess;
-
 	PVOID addr1 = reinterpret_cast<PVOID>(0x00401000);
 	BYTE data1[] = { 0x90, 0x90, 0x90, 0x90 };
 
-	//
-	// 绕过VMP3.x 的内存保护
-	//
 	hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, GetCurrentProcessId());
 	if (hProcess)
 	{
@@ -669,11 +687,40 @@ DWORD WINAPI ThreadProc(LPVOID lpThreadParameter)
 
 		CloseHandle(hProcess);
 	}
-
 	return 0;
 }
-
-
+//异常函数
+LONG NTAPI Handler(struct _EXCEPTION_POINTERS* ExceptionInfo)
+{
+	if (ExceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_BREAKPOINT)
+	{
+		if ((DWORD)ExceptionInfo->ExceptionRecord->ExceptionAddress == HookAddr)
+		{
+			i += 1;
+			//DbgPrintf("HookIn:%d",i);
+			if (i == 18)
+			{
+				DbgPrintf("CreateThread");
+				//启动补丁线程或者其他操作
+				HANDLE hThread = CreateThread(NULL, NULL, ThreadProc, NULL, NULL, NULL);
+				if (hThread)
+				{
+					CloseHandle(hThread);
+				}
+			}
+			ExceptionInfo->ContextRecord->Eip = (DWORD)&OriginalFunc;
+			return EXCEPTION_CONTINUE_EXECUTION;
+		}
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+}
+VOID SetHook()
+{
+	DWORD dwOldProtect;
+	VirtualProtect((LPVOID)HookAddr, 1, PAGE_EXECUTE_READWRITE, &dwOldProtect);
+	*(UCHAR*)HookAddr = 0xCC;
+	VirtualProtect((LPVOID)HookAddr, 1, dwOldProtect, &dwOldProtect);
+}
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, PVOID pvReserved)
 {
 	if (dwReason == DLL_PROCESS_ATTACH)
@@ -682,7 +729,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, PVOID pvReserved)
 
 		if (Load() && Init())
 		{
-			TCHAR szAppName[MAX_PATH] = TEXT("MyApp.exe");//请修改宿主进程名
+			TCHAR szAppName[MAX_PATH] = TEXT("定制版服务端37.exe");//请修改宿主进程名
 			TCHAR szCurName[MAX_PATH];
 
 			GetModuleFileName(NULL, szCurName, MAX_PATH);
@@ -691,11 +738,15 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, PVOID pvReserved)
 			//是否判断宿主进程名
 			if (StrCmpI(szCurName, szAppName) == 0)
 			{
-				//启动补丁线程或者其他操作
-				HANDLE hThread = CreateThread(NULL, NULL, ThreadProc, NULL, NULL, NULL);
-				if (hThread)
+				HMODULE hwnd = LoadLibraryA("user32.dll"); //装载user32.dll
+				if (hwnd != 0)
 				{
-					CloseHandle(hThread);
+					HookAddr = (DWORD)GetProcAddress(hwnd, "CreateWindowExW") + 2;
+					ResumeAddr = HookAddr + 1;
+					DbgPrintf("HookAddr:%X", HookAddr);
+					DbgPrintf("ResumeAddr:%X", ResumeAddr);
+					AddVectoredExceptionHandler(1, Handler);
+					SetHook();
 				}
 			}
 		}

@@ -2,6 +2,8 @@
 #include <Shlwapi.h>
 #include <sstream>
 
+
+
 #pragma region HookConfig
 #pragma comment( lib, "Shlwapi.lib")
 #pragma comment(linker, "/EXPORT:Noname2=_AheadLib_Unnamed2,@2,NONAME")
@@ -677,14 +679,22 @@ void __declspec(naked) OriginalFunc(void)
 DWORD WINAPI ThreadProc(LPVOID lpThreadParameter)
 {
 	HANDLE hProcess;
-	PVOID addr1 = reinterpret_cast<PVOID>(0x00401000);
-	BYTE data1[] = { 0x90, 0x90, 0x90, 0x90 };
-
 	hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, GetCurrentProcessId());
 	if (hProcess)
 	{
-		WriteProcessMemory(hProcess, addr1, data1, sizeof(data1), NULL);
-
+		PVOID Addr;
+		for (int t = 0; t <= 60; t++)
+		{
+			ReadProcessMemory(hProcess, (LPCVOID)0x008C6304, &Addr, 4, NULL);
+			DbgPrintf("%d", Addr);
+			if (Addr != 0)
+			{
+				break;
+			}
+			Sleep(1000);
+		}
+		char Key[] = "ABCDEFGH";
+		WriteProcessMemory(hProcess, Addr, Key, 8, NULL);
 		CloseHandle(hProcess);
 	}
 	return 0;
@@ -698,7 +708,7 @@ LONG NTAPI Handler(struct _EXCEPTION_POINTERS* ExceptionInfo)
 		{
 			i += 1;
 			//DbgPrintf("HookIn:%d",i);
-			if (i == 18)
+			if (i == 17)
 			{
 				DbgPrintf("CreateThread");
 				//启动补丁线程或者其他操作

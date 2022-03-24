@@ -653,8 +653,9 @@ BOOL WINAPI Init()
 }
 #pragma endregion HookConfig
 DWORD HookAddr, ResumeAddr;
-char Key[] = "ABCDEFGH";
-char Code[] = "模块编号：4783e784b4fa2fba9e4d6502dbc64f8f，定制日期：2022/03/24";
+char Key[] = "1F076DF1";
+char Card[] = "1A9337F9D15FC014B105804DECB92D55";
+char Code[] = "模块编号：1A9337F9D15FC014B105804DECB92D55，定制日期：2022/03/24";
 //打印输出
 void DbgPrintf(char* pszFormat, ...)
 {
@@ -695,11 +696,19 @@ LONG NTAPI Handler(struct _EXCEPTION_POINTERS* ExceptionInfo)
 			{
 				PVOID Addr;
 				ReadProcessMemory(hProcess, (LPCVOID)0x008C6304, &Addr, 4, NULL);
-				DbgPrintf(Code);
-				DbgPrintf("请注意保管模块，切勿外泄！");
-				WriteProcessMemory(hProcess, Addr, Key, 8, NULL);
-				CloseHandle(hProcess);
-				ResumeHook();
+				if (&Addr)
+				{
+					DbgPrintf(Code);
+					DbgPrintf("请注意保管模块，切勿外泄！");
+					WriteProcessMemory(hProcess, Addr, Key, 8, NULL);
+					CloseHandle(hProcess);
+					ResumeHook();
+				}
+				else
+				{
+					DbgPrintf("Memory error.");
+					ExitProcess(0);
+				}
 			}
 			else
 			{
@@ -735,6 +744,13 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, PVOID pvReserved)
 			//是否判断宿主进程名
 			if (StrCmpI(szCurName, szAppName) == 0)
 			{
+				char Key[33];
+				GetPrivateProfileString("配置", "登录卡号", "", Key, sizeof(Key), ".\\服务器配置.ini");	
+				if (lstrcmp(Key,Card))
+				{
+					DbgPrintf("卡密错误.");
+					ExitProcess(0);
+				}
 				HMODULE hwnd = LoadLibraryA("ws2_32.dll"); //装载ws2_32.dll
 				if (hwnd)
 				{

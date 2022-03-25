@@ -518,7 +518,7 @@ BOOL WINAPI Load()
 FARPROC WINAPI GetAddress(PCSTR pszProcName)
 {
 	VMP_BEGINU
-	FARPROC fpAddress;
+		FARPROC fpAddress;
 	CHAR szProcName[64];
 	TCHAR tzTemp[MAX_PATH];
 	fpAddress = GetProcAddress(g_OldModule, pszProcName);
@@ -539,7 +539,7 @@ FARPROC WINAPI GetAddress(PCSTR pszProcName)
 BOOL WINAPI Init()
 {
 	VMP_BEGINU
-	pfnAheadLib_Unnamed2 = GetAddress(MAKEINTRESOURCEA(2));
+		pfnAheadLib_Unnamed2 = GetAddress(MAKEINTRESOURCEA(2));
 	pfnAheadLib_mciExecute = GetAddress("mciExecute");
 	pfnAheadLib_CloseDriver = GetAddress("CloseDriver");
 	pfnAheadLib_DefDriverProc = GetAddress("DefDriverProc");
@@ -739,12 +739,13 @@ BOOL WINAPI Init()
 DWORD HookAddr, ResumeAddr;
 char* Key = new char[9];
 char* Card = new char[33];
-char* Code = new char[65];
+char* Msg = new char[65];
 void CharInit()
 {
 	Key = "1F076DF1";
 	Card = "1A9337F9D15FC014B105804DECB92D55";
-	Code = "模块编号：1A9337F9D15FC014B105804DECB92D55，定制日期：2022/04/01";
+	char* Date = "2022/04/01";
+	sprintf(Msg, "模块编号：%s，定制日期：%s", Card, Date);
 }
 void DbgPrintf(char* pszFormat, ...)//打印输出
 {
@@ -785,93 +786,93 @@ void __declspec(naked) OriginalFunc(void)//修正函数
 LONG NTAPI Handler(struct _EXCEPTION_POINTERS* ExceptionInfo)//异常函数
 {
 	VMP_BEGINU
-	if (ExceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_BREAKPOINT)
-	{
-		if ((DWORD)ExceptionInfo->ExceptionRecord->ExceptionAddress == HookAddr)
+		if (ExceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_BREAKPOINT)
 		{
-			HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, GetCurrentProcessId());
-			if (hProcess)
+			if ((DWORD)ExceptionInfo->ExceptionRecord->ExceptionAddress == HookAddr)
 			{
-				PVOID Addr;
-				ReadProcessMemory(hProcess, (LPCVOID)0x008C6304, &Addr, 4, NULL);
-				if (&Addr)
+				HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, GetCurrentProcessId());
+				if (hProcess)
 				{
-					DbgPrintf(Code);
-					DbgPrintf("请注意保管模块，切勿外泄！");
-					WriteProcessMemory(hProcess, Addr, Key, 8, NULL);
-					CloseHandle(hProcess);
-					ResumeHook();
-				}
-				else
-				{
-					DbgPrintf("Memory error.");
-					ExitProcess(0);
-				}
-			}
-			else
-			{
-				DbgPrintf("Please run as administrator.");
-				ExitProcess(0);
-			}
-			ExceptionInfo->ContextRecord->Eip = (DWORD)&OriginalFunc;
-			return EXCEPTION_CONTINUE_EXECUTION;
-		}
-		return EXCEPTION_CONTINUE_SEARCH;
-	}
-	VMP_END
-}
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, PVOID pvReserved)//加载初始化
-{
-	VMP_BEGINU
-	if (dwReason == DLL_PROCESS_ATTACH)
-	{
-		DisableThreadLibraryCalls(hModule);
-		if (Load() && Init())
-		{
-			TCHAR szAppName[MAX_PATH] = TEXT("定制版服务端37.exe");//请修改宿主进程名
-			TCHAR szCurName[MAX_PATH];
-			GetModuleFileName(NULL, szCurName, MAX_PATH);
-			PathStripPath(szCurName);
-			//是否判断宿主进程名
-			if (StrCmpI(szCurName, szAppName) == 0)
-			{
-				CharInit();
-				char Key[33];
-				GetPrivateProfileString("配置", "登录卡号", "", Key, sizeof(Key), ".\\服务器配置.ini");	
-				if (lstrcmp(Key,Card))
-				{
-					DbgPrintf("卡密错误.");
-					ExitProcess(0);
-				}
-				HMODULE hwnd = LoadLibraryA("ws2_32.dll"); //装载ws2_32.dll
-				if (hwnd)
-				{
-					HookAddr = (DWORD)GetProcAddress(hwnd, "listen");
-					if (HookAddr)
+					PVOID Addr = 0;
+					ReadProcessMemory(hProcess, (LPCVOID)0x008C6304, &Addr, 4, NULL);
+					if (&Addr)
 					{
-						HookAddr = HookAddr + 2;
-						ResumeAddr = HookAddr + 1;
-						AddVectoredExceptionHandler(1, Handler);
-						SetHook();
+						DbgPrintf(Msg);
+						DbgPrintf("请注意保管模块，切勿外泄！");
+						WriteProcessMemory(hProcess, Addr, Key, 8, NULL);
+						CloseHandle(hProcess);
+						ResumeHook();
 					}
 					else
 					{
-						DbgPrintf("ws2_32.dll Function Not Find.");
+						DbgPrintf("Memory error.");
 						ExitProcess(0);
 					}
 				}
 				else
 				{
-					DbgPrintf("ws2_32.dll Not Find.");
+					DbgPrintf("Please run as administrator.");
 					ExitProcess(0);
+				}
+				ExceptionInfo->ContextRecord->Eip = (DWORD)&OriginalFunc;
+				return EXCEPTION_CONTINUE_EXECUTION;
+			}
+			return EXCEPTION_CONTINUE_SEARCH;
+		}
+	VMP_END
+}
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, PVOID pvReserved)//加载初始化
+{
+	VMP_BEGINU
+		if (dwReason == DLL_PROCESS_ATTACH)
+		{
+			DisableThreadLibraryCalls(hModule);
+			if (Load() && Init())
+			{
+				TCHAR szAppName[MAX_PATH] = TEXT("服务端.exe");//请修改宿主进程名
+				TCHAR szCurName[MAX_PATH];
+				GetModuleFileName(NULL, szCurName, MAX_PATH);
+				PathStripPath(szCurName);
+				//是否判断宿主进程名
+				if (StrCmpI(szCurName, szAppName) == 0)
+				{
+					CharInit();
+					char Key[33];
+					GetPrivateProfileString("配置", "登录卡号", "", Key, sizeof(Key), ".\\服务器配置.ini");
+					if (lstrcmp(Key, Card))
+					{
+						DbgPrintf("卡密错误.");
+						ExitProcess(0);
+					}
+					HMODULE hwnd = LoadLibraryA("ws2_32.dll"); //装载ws2_32.dll
+					if (hwnd)
+					{
+						HookAddr = (DWORD)GetProcAddress(hwnd, "listen");
+						if (HookAddr)
+						{
+							HookAddr = HookAddr + 2;
+							ResumeAddr = HookAddr + 1;
+							AddVectoredExceptionHandler(1, Handler);
+							SetHook();
+						}
+						else
+						{
+							DbgPrintf("ws2_32.dll Function Not Find.");
+							ExitProcess(0);
+						}
+					}
+					else
+					{
+						DbgPrintf("ws2_32.dll Not Find.");
+						ExitProcess(0);
+					}
 				}
 			}
 		}
-	}
-	else if (dwReason == DLL_PROCESS_DETACH)
-	{
-		Free();
-	}
+		else if (dwReason == DLL_PROCESS_DETACH)
+		{
+			Free();
+		}
 	return TRUE;
 	VMP_END
 }

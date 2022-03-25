@@ -1,6 +1,104 @@
-﻿#include <windows.h>
-#include <Shlwapi.h>
+﻿#include <Shlwapi.h>
 #include <sstream>
+#pragma region VMPSDK
+#define VMP_BEGINV \
+_asm _emit 0xEB \
+_asm _emit 0x10 \
+_asm _emit 0x56 \
+_asm _emit 0x4D \
+_asm _emit 0x50 \
+_asm _emit 0x72 \
+_asm _emit 0x6F \
+_asm _emit 0x74 \
+_asm _emit 0x65 \
+_asm _emit 0x63 \
+_asm _emit 0x74 \
+_asm _emit 0x20 \
+_asm _emit 0x62 \
+_asm _emit 0x65 \
+_asm _emit 0x67 \
+_asm _emit 0x69 \
+_asm _emit 0x6E \
+_asm _emit 0x01 
+
+#define VMP_BEGINM \
+_asm _emit 0xEB \
+_asm _emit 0x10 \
+_asm _emit 0x56 \
+_asm _emit 0x4D \
+_asm _emit 0x50 \
+_asm _emit 0x72 \
+_asm _emit 0x6F \
+_asm _emit 0x74 \
+_asm _emit 0x65 \
+_asm _emit 0x63 \
+_asm _emit 0x74 \
+_asm _emit 0x20 \
+_asm _emit 0x62 \
+_asm _emit 0x65 \
+_asm _emit 0x67 \
+_asm _emit 0x69 \
+_asm _emit 0x6E \
+_asm _emit 0x02 
+
+#define VMP_BEGINU \
+_asm _emit 0xEB \
+_asm _emit 0x10 \
+_asm _emit 0x56 \
+_asm _emit 0x4D \
+_asm _emit 0x50 \
+_asm _emit 0x72 \
+_asm _emit 0x6F \
+_asm _emit 0x74 \
+_asm _emit 0x65 \
+_asm _emit 0x63 \
+_asm _emit 0x74 \
+_asm _emit 0x20 \
+_asm _emit 0x62 \
+_asm _emit 0x65 \
+_asm _emit 0x67 \
+_asm _emit 0x69 \
+_asm _emit 0x6E \
+_asm _emit 0x03 
+
+#define VMP_BEGIN \
+_asm _emit 0xEB \
+_asm _emit 0x10 \
+_asm _emit 0x56 \
+_asm _emit 0x4D \
+_asm _emit 0x50 \
+_asm _emit 0x72 \
+_asm _emit 0x6F \
+_asm _emit 0x74 \
+_asm _emit 0x65 \
+_asm _emit 0x63 \
+_asm _emit 0x74 \
+_asm _emit 0x20 \
+_asm _emit 0x62 \
+_asm _emit 0x65 \
+_asm _emit 0x67 \
+_asm _emit 0x69 \
+_asm _emit 0x6E \
+_asm _emit 0x00 
+
+#define VMP_END \
+_asm _emit 0xEB \
+_asm _emit 0x0E \
+_asm _emit 0x56 \
+_asm _emit 0x4D \
+_asm _emit 0x50 \
+_asm _emit 0x72 \
+_asm _emit 0x6F \
+_asm _emit 0x74 \
+_asm _emit 0x65 \
+_asm _emit 0x63 \
+_asm _emit 0x74 \
+_asm _emit 0x20 \
+_asm _emit 0x65 \
+_asm _emit 0x6E \
+_asm _emit 0x64 \
+_asm _emit 0x00 
+#pragma endregion VMPSDK
 #pragma region HookConfig
 #pragma comment( lib, "Shlwapi.lib")
 #pragma comment(linker, "/EXPORT:Noname2=_AheadLib_Unnamed2,@2,NONAME")
@@ -196,8 +294,6 @@
 #pragma comment(linker, "/EXPORT:waveOutWrite=_AheadLib_waveOutWrite,@192")
 #pragma comment(linker, "/EXPORT:wid32Message=_AheadLib_wid32Message,@193")
 #pragma comment(linker, "/EXPORT:wod32Message=_AheadLib_wod32Message,@194")
-
-
 PVOID pfnAheadLib_Unnamed2;
 PVOID pfnAheadLib_mciExecute;
 PVOID pfnAheadLib_CloseDriver;
@@ -391,11 +487,8 @@ PVOID pfnAheadLib_waveOutUnprepareHeader;
 PVOID pfnAheadLib_waveOutWrite;
 PVOID pfnAheadLib_wid32Message;
 PVOID pfnAheadLib_wod32Message;
-
-
 static
 HMODULE g_OldModule = NULL;
-
 VOID WINAPI Free()
 {
 	if (g_OldModule)
@@ -403,41 +496,31 @@ VOID WINAPI Free()
 		FreeLibrary(g_OldModule);
 	}
 }
-
-
 BOOL WINAPI Load()
 {
 	TCHAR tzPath[MAX_PATH];
 	TCHAR tzTemp[MAX_PATH * 2];
-
 	//
 	// 这里是否从系统目录或当前目录加载原始DLL
 	//
 	//GetModuleFileName(NULL,tzPath,MAX_PATH); //获取本目录下的
 	//PathRemoveFileSpec(tzPath);
-
 	GetSystemDirectory(tzPath, MAX_PATH); //默认获取系统目录的
-
 	lstrcat(tzPath, TEXT("\\winmm.dll"));
-
 	g_OldModule = LoadLibrary(tzPath);
 	if (g_OldModule == NULL)
 	{
 		wsprintf(tzTemp, TEXT("无法找到模块 %s,程序无法正常运行"), tzPath);
 		MessageBox(NULL, tzTemp, TEXT("AheadLib"), MB_ICONSTOP);
 	}
-
 	return (g_OldModule != NULL);
-
 }
-
-
 FARPROC WINAPI GetAddress(PCSTR pszProcName)
 {
+	VMP_BEGINU
 	FARPROC fpAddress;
 	CHAR szProcName[64];
 	TCHAR tzTemp[MAX_PATH];
-
 	fpAddress = GetProcAddress(g_OldModule, pszProcName);
 	if (fpAddress == NULL)
 	{
@@ -446,16 +529,16 @@ FARPROC WINAPI GetAddress(PCSTR pszProcName)
 			wsprintfA(szProcName, "#%d", pszProcName);
 			pszProcName = szProcName;
 		}
-
 		wsprintf(tzTemp, TEXT("无法找到函数 %hs,程序无法正常运行"), pszProcName);
 		MessageBox(NULL, tzTemp, TEXT("AheadLib"), MB_ICONSTOP);
 		ExitProcess(-2);
 	}
 	return fpAddress;
+	VMP_END
 }
-
 BOOL WINAPI Init()
 {
+	VMP_BEGINU
 	pfnAheadLib_Unnamed2 = GetAddress(MAKEINTRESOURCEA(2));
 	pfnAheadLib_mciExecute = GetAddress("mciExecute");
 	pfnAheadLib_CloseDriver = GetAddress("CloseDriver");
@@ -650,15 +733,22 @@ BOOL WINAPI Init()
 	pfnAheadLib_wid32Message = GetAddress("wid32Message");
 	pfnAheadLib_wod32Message = GetAddress("wod32Message");
 	return TRUE;
+	VMP_END
 }
 #pragma endregion HookConfig
 DWORD HookAddr, ResumeAddr;
-char Key[] = "1F076DF1";
-char Card[] = "1A9337F9D15FC014B105804DECB92D55";
-char Code[] = "模块编号：1A9337F9D15FC014B105804DECB92D55，定制日期：2022/03/24";
-//打印输出
-void DbgPrintf(char* pszFormat, ...)
+char* Key = new char[9];
+char* Card = new char[33];
+char* Code = new char[65];
+void CharInit()
 {
+	Key = "1F076DF1";
+	Card = "1A9337F9D15FC014B105804DECB92D55";
+	Code = "模块编号：1A9337F9D15FC014B105804DECB92D55，定制日期：2022/04/01";
+}
+void DbgPrintf(char* pszFormat, ...)//打印输出
+{
+	VMP_BEGINU
 	char szBuf[1024];
 	va_list argList;
 	va_start(argList, pszFormat);
@@ -666,27 +756,35 @@ void DbgPrintf(char* pszFormat, ...)
 	strcat_s(szBuf, " [E盾企业服务端定制版]\r\n");
 	OutputDebugStringA(szBuf);
 	va_end(argList);
+	VMP_END
 }
-//修正函数
-void __declspec(naked) OriginalFunc(void)
-{
-	__asm
-	{
-		push ebp
-		jmp[ResumeAddr]
-	}
-}
-//恢复Hook点
-VOID ResumeHook()
+VOID ResumeHook()//恢复Hook点
 {
 	DWORD dwOldProtect;
 	VirtualProtect((LPVOID)HookAddr, 1, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 	*(UCHAR*)HookAddr = 0x55;
 	VirtualProtect((LPVOID)HookAddr, 1, dwOldProtect, &dwOldProtect);
 }
-//异常函数
-LONG NTAPI Handler(struct _EXCEPTION_POINTERS* ExceptionInfo)
+VOID SetHook() //设置Hook点
 {
+	DWORD dwOldProtect;
+	VirtualProtect((LPVOID)HookAddr, 1, PAGE_EXECUTE_READWRITE, &dwOldProtect);
+	*(UCHAR*)HookAddr = 0xCC;
+	VirtualProtect((LPVOID)HookAddr, 1, dwOldProtect, &dwOldProtect);
+}
+void __declspec(naked) OriginalFunc(void)//修正函数
+{
+	VMP_BEGINU
+		__asm
+	{
+		push ebp
+		jmp[ResumeAddr]
+	}
+	VMP_END
+}
+LONG NTAPI Handler(struct _EXCEPTION_POINTERS* ExceptionInfo)//异常函数
+{
+	VMP_BEGINU
 	if (ExceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_BREAKPOINT)
 	{
 		if ((DWORD)ExceptionInfo->ExceptionRecord->ExceptionAddress == HookAddr)
@@ -720,18 +818,11 @@ LONG NTAPI Handler(struct _EXCEPTION_POINTERS* ExceptionInfo)
 		}
 		return EXCEPTION_CONTINUE_SEARCH;
 	}
+	VMP_END
 }
-//设置Hook点
-VOID SetHook()
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, PVOID pvReserved)//加载初始化
 {
-	DWORD dwOldProtect;
-	VirtualProtect((LPVOID)HookAddr, 1, PAGE_EXECUTE_READWRITE, &dwOldProtect);
-	*(UCHAR*)HookAddr = 0xCC;
-	VirtualProtect((LPVOID)HookAddr, 1, dwOldProtect, &dwOldProtect);
-}
-//加载初始化
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, PVOID pvReserved)
-{
+	VMP_BEGINU
 	if (dwReason == DLL_PROCESS_ATTACH)
 	{
 		DisableThreadLibraryCalls(hModule);
@@ -744,6 +835,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, PVOID pvReserved)
 			//是否判断宿主进程名
 			if (StrCmpI(szCurName, szAppName) == 0)
 			{
+				CharInit();
 				char Key[33];
 				GetPrivateProfileString("配置", "登录卡号", "", Key, sizeof(Key), ".\\服务器配置.ini");	
 				if (lstrcmp(Key,Card))
@@ -781,6 +873,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, PVOID pvReserved)
 		Free();
 	}
 	return TRUE;
+	VMP_END
 }
 #pragma region HookConfig
 EXTERN_C __declspec(naked) void __cdecl AheadLib_Unnamed2(void)
